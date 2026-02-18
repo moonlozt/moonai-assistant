@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoonAI</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-content">
+            <div class="moon-container">
+                <div class="moon-text" id="dynamicText">Moon</div>
+            </div>
+            <div class="trend-subtitle" id="trendSubtitle">Detecting deep space signals...</div>
+            <div class="loading-dots">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="mainContainer">
+        <div class="header">
+            <button class="clear-chat" onclick="clearChat()">Refresh</button>
+            <h1>MoonAI</h1>
+            <p>Intelligence at the Speed of Rocket</p>
+            <div class="api-status">
+                <div class="status-dot"></div>
+                <span id="statusText">Ready</span>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="welcome-message">
+                <div style="font-size: 48px; margin-bottom: 15px;">🌕</div>
+                <h2>Welcome!</h2>
+                <p>Your free AI assistant powered by MoonAI</p>
+                <p style="font-size:13px; opacity:0.7;">💡 Tip: Start your message with <strong>/image</strong> or <strong>/img</strong> to generate an image!</p>
+                <div class="suggestions" id="suggestionChips">
+                    <div class="suggestion-chip" onclick="sendSuggestion('Explain how AI works')">🧠 How AI works</div>
+                    <div class="suggestion-chip" onclick="sendSuggestion('Write a Python script')">💻 Code example</div>
+                    <div class="suggestion-chip" onclick="sendSuggestion('Tell me a fun fact')">🎯 Fun fact</div>
+                    <div class="suggestion-chip" onclick="sendSuggestion('/image a beautiful moonlit ocean at night')">🎨 Generate image</div>
+                </div>
+            </div>
+
+            <div class="typing-indicator" id="typingIndicator">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-form">
+                <input type="text" id="userInput" placeholder="Ask anything... or /image a sunset over mountains" onkeypress="handleKeyPress(event)">
+                <button onclick="sendMessage()" id="sendButton">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatMessages    = document.getElementById('chatMessages');
+        const userInput       = document.getElementById('userInput');
+        const sendButton      = document.getElementById('sendButton');
+        const statusText      = document.getElementById('statusText');
+        const loadingScreen   = document.getElementById('loadingScreen');
+        const mainContainer   = document.getElementById('mainContainer');
+        const dynamicText     = document.getElementById('dynamicText');
+        const trendSubtitle   = document.getElementById('trendSubtitle');
+        const suggestionChips = document.getElementById('suggestionChips');
+
+        let conversationId  = null;
+        let isBusy          = false;   // true while waiting for AI response
+        let currentSession  = 0;       // increments on every clearChat, used to discard stale responses
+
+        // ─── Image trigger detection ───────────────────────────────────────────
+        const IMAGE_PREFIXES = ['/image ', '/img ', '/imagine '];
+        const IMAGE_KEYWORDS = [
+            /^(generate|create|make|draw|paint|render|show)\s+(me\s+)?(an?\s+)?image\s+of\s+/i,
+            /^(generate|create|make|draw|paint|render)\s+(an?\s+)?picture\s+of\s+/i,
+        ];
+
+        function detectImageRequest(message) {
+            const lower = message.toLowerCase();
+            for (const prefix of IMAGE_PREFIXES) {
+                if (lower.startsWith(prefix)) {
+                    return message.slice(prefix.length).trim();
+                }
+            }
+            for (const regex of IMAGE_KEYWORDS) {
+                const match = message.match(regex);
+                if (match) {
+                    return message.slice(match[0].length).trim();
+                }
+            }
+            return null; // not an image request
+        }
+        // ──────────────────────────────────────────────────────────────────────
+
+        const trendingCategories = [
+            { emoji: '🤖', topics: ['AI', 'Machine Learning', 'Deep Learning', 'Neural Networks', 'Automation'],       labels: ['AI', 'ML', 'Deep Learning', 'Neural Nets', 'Automation'] },
+            { emoji: '🌍', topics: ['Climate Change', 'Space Exploration', 'Earth', 'Ocean', 'Nature'],                labels: ['Climate', 'Space', 'Earth', 'Ocean', 'Nature'] },
+            { emoji: '💻', topics: ['Coding', 'Python', 'JavaScript', 'Web Development', 'App Development'],           labels: ['Coding', 'Python', 'JavaScript', 'Web Dev', 'Apps'] },
+            { emoji: '🎮', topics: ['Gaming', 'Esports', 'Virtual Reality', 'Augmented Reality', 'Metaverse'],         labels: ['Gaming', 'Esports', 'VR', 'AR', 'Metaverse'] },
+            { emoji: '💡', topics: ['Innovation', 'Startups', 'Technology', 'Future Tech', 'Ideas'],                   labels: ['Innovation', 'Startups', 'Tech', 'Future', 'Ideas'] },
+            { emoji: '🎨', topics: ['Art', 'Design', 'Creativity', 'Music', 'Films'],                                  labels: ['Art', 'Design', 'Creative', 'Music', 'Films'] },
+            { emoji: '📱', topics: ['Smartphones', 'Apps', 'Social Media', 'Digital', 'Online Trends'],               labels: ['Phones', 'Apps', 'Social', 'Digital', 'Online'] },
+            { emoji: '🚀', topics: ['SpaceX', 'NASA', 'Mars', 'Rockets', 'Astronomy'],                                labels: ['SpaceX', 'NASA', 'Mars', 'Rockets', 'Space'] },
+            { emoji: '🧬', topics: ['Science', 'Biology', 'DNA', 'Research', 'Health Tech'],                          labels: ['Science', 'Biology', 'DNA', 'Research', 'Health'] },
+            { emoji: '⚡', topics: ['Energy', 'Electric Vehicles', 'Solar Power', 'Battery Tech', 'Sustainability'],   labels: ['Energy', 'EVs', 'Solar', 'Battery', 'Green Tech'] }
+        ];
+
+        const suggestionTemplates = [
+            { format: (topic) => `Explain ${topic}` },
+            { format: (topic) => `Tell me about ${topic}` },
+            { format: (topic) => `How does ${topic} work?` },
+            { format: (topic) => `Latest news on ${topic}` },
+            { format: (topic) => `${topic} tutorial` },
+            { format: (topic) => `Fun facts about ${topic}` }
+        ];
+
+        async function fetchTrendingTopics() {
+            await new Promise(resolve => setTimeout(resolve, 800));
+            const randomCategory = trendingCategories[Math.floor(Math.random() * trendingCategories.length)];
+            const randomIndex    = Math.floor(Math.random() * randomCategory.topics.length);
+            return {
+                topic:    randomCategory.topics[randomIndex],
+                label:    randomCategory.labels[randomIndex],
+                emoji:    randomCategory.emoji,
+                category: randomCategory
+            };
+        }
+
+        function generateSuggestions() {
+            const suggestions    = [];
+            const usedCategories = new Set();
+            while (suggestions.length < 4 && usedCategories.size < trendingCategories.length) {
+                const randomCat = trendingCategories[Math.floor(Math.random() * trendingCategories.length)];
+                const catKey    = randomCat.emoji;
+                if (!usedCategories.has(catKey)) {
+                    const randomIndex = Math.floor(Math.random() * randomCat.topics.length);
+                    const template    = suggestionTemplates[Math.floor(Math.random() * suggestionTemplates.length)];
+                    suggestions.push({
+                        emoji: randomCat.emoji,
+                        text:  template.format(randomCat.topics[randomIndex]),
+                        label: randomCat.labels[randomIndex]
+                    });
+                    usedCategories.add(catKey);
+                }
+            }
+            return suggestions;
+        }
+
+        async function loadTrendingContent() {
+            try {
+                const trendData = await fetchTrendingTopics();
+                dynamicText.textContent   = trendData.label;
+                trendSubtitle.textContent = `Alien Radar`;
+                const suggestions = generateSuggestions();
+                suggestionChips.innerHTML = suggestions.map(s =>
+                    `<div class="suggestion-chip" onclick="sendSuggestion('${s.text}')">${s.emoji} ${s.label}</div>`
+                ).join('');
+            } catch (error) {
+                console.error('Error loading trends:', error);
+                dynamicText.textContent   = 'Moon';
+                trendSubtitle.textContent = 'AI Assistant';
+            }
+        }
+
+        function rotateLoadingWords() {
+            const allTopics  = trendingCategories.flatMap(cat => cat.labels);
+            let currentIndex = 0;
+            const interval = setInterval(() => {
+                if (loadingScreen.style.display === 'none') { clearInterval(interval); return; }
+                currentIndex            = (currentIndex + 1) % allTopics.length;
+                dynamicText.textContent = allTopics[currentIndex];
+            }, 1000);
+        }
+
+        window.addEventListener('load', async () => {
+            await loadTrendingContent();
+            rotateLoadingWords();
+            setTimeout(() => {
+                loadingScreen.classList.add('fade-out');
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                    mainContainer.classList.add('fade-in');
+                }, 500);
+            }, 7000);
+        });
+
+        setTimeout(() => { userInput.focus(); }, 7500);
+
+        // ─── Add a regular text message bubble ────────────────────────────────
+        function addMessage(text, isUser, isError = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'bot'} ${isError ? 'error' : ''}`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+
+            let formatted = text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g,     '<em>$1</em>')
+                .replace(/`([^`]+)`/g,     '<code>$1</code>');
+
+            contentDiv.innerHTML = formatted;
+            messageDiv.appendChild(contentDiv);
+
+            const typingIndicator = document.getElementById('typingIndicator');
+            chatMessages.insertBefore(messageDiv, typingIndicator);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // ─── Add an image bubble ──────────────────────────────────────────────
+        function addImageMessage(base64DataUrl, promptText) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot';
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+
+            const caption = document.createElement('p');
+            caption.style.margin = '0 0 8px 0';
+            caption.style.fontSize = '13px';
+            caption.style.opacity = '0.7';
+            caption.textContent = `🎨 "${promptText}"`;
+
+            const img = document.createElement('img');
+            img.src = base64DataUrl;
+            img.alt = promptText;
+            img.style.maxWidth  = '100%';
+            img.style.borderRadius = '8px';
+            img.style.display   = 'block';
+            img.style.marginTop = '4px';
+
+            contentDiv.appendChild(caption);
+            contentDiv.appendChild(img);
+            messageDiv.appendChild(contentDiv);
+
+            const typingIndicator = document.getElementById('typingIndicator');
+            chatMessages.insertBefore(messageDiv, typingIndicator);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // ─── API calls ────────────────────────────────────────────────────────
+        async function callChatAPI(userMessage) {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: userMessage, conversationId })
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'API request failed');
+            }
+            const data = await response.json();
+            conversationId = data.conversationId;
+            return data.message;
+        }
+
+        async function callImageAPI(prompt) {
+            const response = await fetch('/api/generate-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt })
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Image generation failed');
+            }
+            const data = await response.json();
+            return data.image; // base64 data URL
+        }
+
+        // ─── Main send handler ────────────────────────────────────────────────
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message || isBusy) return;
+
+            const welcomeMsg = document.querySelector('.welcome-message');
+            if (welcomeMsg) welcomeMsg.remove();
+
+            addMessage(message, true);
+            userInput.value     = '';
+            userInput.disabled  = true;
+            sendButton.disabled = true;
+            isBusy = true;
+
+            // Snapshot the session at the time this request was made.
+            // If clearChat() is called while waiting, currentSession increments
+            // and we know to throw the stale response away.
+            const mySession = currentSession;
+
+            const typingIndicator = document.getElementById('typingIndicator');
+            typingIndicator.classList.add('active');
+
+            const imagePrompt = detectImageRequest(message);
+
+            try {
+                if (imagePrompt) {
+                    statusText.textContent = 'Generating image...';
+                    const imageDataUrl = await callImageAPI(imagePrompt);
+                    if (mySession !== currentSession) return;
+                    typingIndicator.classList.remove('active');
+                    addImageMessage(imageDataUrl, imagePrompt);
+                } else {
+                    statusText.textContent = 'Thinking...';
+                    const reply = await callChatAPI(message);
+                    if (mySession !== currentSession) return;
+                    typingIndicator.classList.remove('active');
+                    addMessage(reply, false);
+                }
+                statusText.textContent = 'Ready';
+            } catch (error) {
+                if (mySession !== currentSession) return;
+                typingIndicator.classList.remove('active');
+                addMessage(`Error: ${error.message}`, false, true);
+                statusText.textContent = 'Error';
+            } finally {
+                if (mySession === currentSession) {
+                    isBusy = false;
+                    userInput.disabled  = false;
+                    sendButton.disabled = false;
+                    userInput.focus();
+                }
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function sendSuggestion(text) {
+            userInput.value = text;
+            sendMessage();
+        }
+
+        async function clearChat() {
+            // Increment session so any in-flight request knows it's stale
+            currentSession++;
+            isBusy = false;
+
+            // Delete the conversation on the backend (fire-and-forget)
+            if (conversationId) {
+                fetch(`/api/conversation/${conversationId}`, { method: 'DELETE' }).catch(() => {});
+            }
+            conversationId = null;
+
+            const suggestions = generateSuggestions();
+            chatMessages.innerHTML = `
+                <div class="welcome-message">
+                    <div style="font-size: 48px; margin-bottom: 15px;">🚀</div>
+                    <h2>Chat Cleared!</h2>
+                    <p>Start a new conversation with fresh trending topics</p>
+                    <p style="font-size:13px; opacity:0.7;">💡 Use <strong>/image</strong> or <strong>/img</strong> to generate images!</p>
+                    <div class="suggestions">
+                        ${suggestions.map(s =>
+                            `<div class="suggestion-chip" onclick="sendSuggestion('${s.text}')">${s.emoji} ${s.label}</div>`
+                        ).join('')}
+                    </div>
+                </div>
+                <div class="typing-indicator" id="typingIndicator">
+                    <span></span><span></span><span></span>
+                </div>
+            `;
+            statusText.textContent = 'Ready';
+            userInput.disabled  = false;
+            sendButton.disabled = false;
+            userInput.value     = '';
+            userInput.focus();
+        }
+    </script>
+</body>
+</html>
