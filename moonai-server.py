@@ -2,9 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 import base64
-import random
 import requests
-from urllib.parse import quote
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -18,8 +16,8 @@ app = Flask(__name__)
 CORS(app)
 
 # Configure APIs
-google_api_key   = os.getenv('GOOGLE_API_KEY')
-pollinations_key = os.getenv('POLLINATIONS_API_KEY')  # optional but recommended
+google_api_key = os.getenv('GOOGLE_API_KEY')
+deepai_api_key = os.getenv('DEEPAI_API_KEY')
 client = genai.Client(api_key=google_api_key) if google_api_key else None
 
 # In-memory conversation storage
@@ -64,35 +62,34 @@ def call_gemini_api(messages, api_key=None):
 
 
 def generate_image(prompt, api_key=None):
-    """Generate image using Pollinations AI (free, no SDK needed)"""
+    """Generate image using DeepAI (free tier)"""
     try:
-        seed = random.randint(1, 999999)
-        encoded = quote(prompt)
+        key = deepai_api_key
+        if not key:
+            return {'success': False, 'error': 'DEEPAI_API_KEY not configured in environment'}
 
-        # Build URL — image.pollinations.ai is the correct endpoint
-        url = (
-            f'https://image.pollinations.ai/prompt/{encoded}'
-            f'?model=flux&width=1024&height=1024&seed={seed}&nologo=true'
+        r = requests.post(
+            'https://api.deepai.org/api/text2img',
+            data={'text': prompt},
+            headers={'api-key': key},
+            timeout=60
         )
 
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': 'https://pollinations.ai/',
-        }
+        if r.status_code == 200:
+            result = r.json()
+            image_url = result.get('output_url')
+            if not image_url:
+                return {'success': False, 'error': 'No image URL in response'}
 
-        # Add token if available (get free one at auth.pollinations.ai)
-        if pollinations_key:
-            headers['Authorization'] = f'Bearer {pollinations_key}'
-
-        r = requests.get(url, headers=headers, timeout=90)
-
-        print(f'Pollinations status: {r.status_code}, content-type: {r.headers.get("content-type")}')
-
-        if r.status_code == 200 and 'image' in r.headers.get('content-type', ''):
-            b64 = base64.b64encode(r.content).decode('utf-8')
-            return {'success': True, 'image': f'data:image/jpeg;base64,{b64}'}
+            # Fetch the image and convert to base64
+            img_response = requests.get(image_url, timeout=30)
+            if img_response.status_code == 200:
+                b64 = base64.b64encode(img_response.content).decode('utf-8')
+                return {'success': True, 'image': f'data:image/jpeg;base64,{b64}'}
+            else:
+                return {'success': False, 'error': f'Failed to fetch image: HTTP {img_response.status_code}'}
         else:
-            return {'success': False, 'error': f'Pollinations returned HTTP {r.status_code}: {r.text[:200]}'}
+            return {'success': False, 'error': f'DeepAI returned HTTP {r.status_code}: {r.text[:200]}'}
 
     except requests.exceptions.Timeout:
         return {'success': False, 'error': 'Image generation timed out. Please try again.'}
@@ -176,18 +173,20 @@ def health():
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
         'geminiConfigured': bool(google_api_key),
-        'pollinationsToken': 'yes' if pollinations_key else 'no (anonymous, may be slow)'
+        'imageConfigured': bool(deepai_api_key)
     })
 
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 3000))
+    port = int(os.getenv('PORT', 10000))
 
     print('\nMoonAI')
     print('━' * 42)
     print(f'✅ Server running on port {port}')
     print(f'🌐 Frontend: http://localhost:{port}')
     print(f'📡 Health check: http://localhost:{port}/api/health')
+    print(f'🔑 Gemini API: {"Configured ✓" if google_api_key else "Not configured ✗"}')
+    print(f'🎨 Image API: {"DeepAI ✓" if deepai_api_key else "Not configured ✗"}')
     print('━' * 42 + '\n')
 
     app.run(host='0.0.0.0', port=port, debug=False)
