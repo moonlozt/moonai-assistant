@@ -35,12 +35,11 @@
                 <div style="font-size: 48px; margin-bottom: 15px;">🌕</div>
                 <h2>Welcome!</h2>
                 <p>Your free AI assistant powered by MoonAI</p>
-                <p style="font-size:13px; opacity:0.7;">💡 Tip: Start your message with <strong>/image</strong> or <strong>/img</strong> to generate an image!</p>
                 <div class="suggestions" id="suggestionChips">
                     <div class="suggestion-chip" onclick="sendSuggestion('Explain how AI works')">🧠 How AI works</div>
                     <div class="suggestion-chip" onclick="sendSuggestion('Write a Python script')">💻 Code example</div>
                     <div class="suggestion-chip" onclick="sendSuggestion('Tell me a fun fact')">🎯 Fun fact</div>
-                    <div class="suggestion-chip" onclick="sendSuggestion('/image a beautiful moonlit ocean at night')">🎨 Generate image</div>
+                    <div class="suggestion-chip" onclick="sendSuggestion('What can you do?')">🌙 What can you do?</div>
                 </div>
             </div>
 
@@ -51,7 +50,7 @@
 
         <div class="input-area">
             <div class="input-form">
-                <input type="text" id="userInput" placeholder="Ask anything... or /image a sunset over mountains" onkeypress="handleKeyPress(event)">
+                <input type="text" id="userInput" placeholder="Ask anything..." onkeypress="handleKeyPress(event)">
                 <button onclick="sendMessage()" id="sendButton">Send</button>
             </div>
         </div>
@@ -68,33 +67,9 @@
         const trendSubtitle   = document.getElementById('trendSubtitle');
         const suggestionChips = document.getElementById('suggestionChips');
 
-        let conversationId  = null;
-        let isBusy          = false;   // true while waiting for AI response
-        let currentSession  = 0;       // increments on every clearChat, used to discard stale responses
-
-        // ─── Image trigger detection ───────────────────────────────────────────
-        const IMAGE_PREFIXES = ['/image ', '/img ', '/imagine '];
-        const IMAGE_KEYWORDS = [
-            /^(generate|create|make|draw|paint|render|show)\s+(me\s+)?(an?\s+)?image\s+of\s+/i,
-            /^(generate|create|make|draw|paint|render)\s+(an?\s+)?picture\s+of\s+/i,
-        ];
-
-        function detectImageRequest(message) {
-            const lower = message.toLowerCase();
-            for (const prefix of IMAGE_PREFIXES) {
-                if (lower.startsWith(prefix)) {
-                    return message.slice(prefix.length).trim();
-                }
-            }
-            for (const regex of IMAGE_KEYWORDS) {
-                const match = message.match(regex);
-                if (match) {
-                    return message.slice(match[0].length).trim();
-                }
-            }
-            return null; // not an image request
-        }
-        // ──────────────────────────────────────────────────────────────────────
+        let conversationId = null;
+        let isBusy         = false;
+        let currentSession = 0;
 
         const trendingCategories = [
             { emoji: '🤖', topics: ['AI', 'Machine Learning', 'Deep Learning', 'Neural Networks', 'Automation'],       labels: ['AI', 'ML', 'Deep Learning', 'Neural Nets', 'Automation'] },
@@ -190,7 +165,6 @@
 
         setTimeout(() => { userInput.focus(); }, 7500);
 
-        // ─── Add a regular text message bubble ────────────────────────────────
         function addMessage(text, isUser, isError = false) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user' : 'bot'} ${isError ? 'error' : ''}`;
@@ -211,38 +185,6 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        // ─── Add an image bubble ──────────────────────────────────────────────
-        function addImageMessage(base64DataUrl, promptText) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message bot';
-
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-
-            const caption = document.createElement('p');
-            caption.style.margin = '0 0 8px 0';
-            caption.style.fontSize = '13px';
-            caption.style.opacity = '0.7';
-            caption.textContent = `🎨 "${promptText}"`;
-
-            const img = document.createElement('img');
-            img.src = base64DataUrl;
-            img.alt = promptText;
-            img.style.maxWidth  = '100%';
-            img.style.borderRadius = '8px';
-            img.style.display   = 'block';
-            img.style.marginTop = '4px';
-
-            contentDiv.appendChild(caption);
-            contentDiv.appendChild(img);
-            messageDiv.appendChild(contentDiv);
-
-            const typingIndicator = document.getElementById('typingIndicator');
-            chatMessages.insertBefore(messageDiv, typingIndicator);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        // ─── API calls ────────────────────────────────────────────────────────
         async function callChatAPI(userMessage) {
             const response = await fetch('/api/chat', {
                 method: 'POST',
@@ -258,21 +200,6 @@
             return data.message;
         }
 
-        async function callImageAPI(prompt) {
-            const response = await fetch('/api/generate-image', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt })
-            });
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Image generation failed');
-            }
-            const data = await response.json();
-            return data.image; // base64 data URL
-        }
-
-        // ─── Main send handler ────────────────────────────────────────────────
         async function sendMessage() {
             const message = userInput.value.trim();
             if (!message || isBusy) return;
@@ -286,30 +213,17 @@
             sendButton.disabled = true;
             isBusy = true;
 
-            // Snapshot the session at the time this request was made.
-            // If clearChat() is called while waiting, currentSession increments
-            // and we know to throw the stale response away.
             const mySession = currentSession;
 
             const typingIndicator = document.getElementById('typingIndicator');
             typingIndicator.classList.add('active');
 
-            const imagePrompt = detectImageRequest(message);
-
             try {
-                if (imagePrompt) {
-                    statusText.textContent = 'Generating image...';
-                    const imageDataUrl = await callImageAPI(imagePrompt);
-                    if (mySession !== currentSession) return;
-                    typingIndicator.classList.remove('active');
-                    addImageMessage(imageDataUrl, imagePrompt);
-                } else {
-                    statusText.textContent = 'Thinking...';
-                    const reply = await callChatAPI(message);
-                    if (mySession !== currentSession) return;
-                    typingIndicator.classList.remove('active');
-                    addMessage(reply, false);
-                }
+                statusText.textContent = 'Thinking...';
+                const reply = await callChatAPI(message);
+                if (mySession !== currentSession) return;
+                typingIndicator.classList.remove('active');
+                addMessage(reply, false);
                 statusText.textContent = 'Ready';
             } catch (error) {
                 if (mySession !== currentSession) return;
@@ -339,11 +253,9 @@
         }
 
         async function clearChat() {
-            // Increment session so any in-flight request knows it's stale
             currentSession++;
             isBusy = false;
 
-            // Delete the conversation on the backend (fire-and-forget)
             if (conversationId) {
                 fetch(`/api/conversation/${conversationId}`, { method: 'DELETE' }).catch(() => {});
             }
@@ -355,7 +267,6 @@
                     <div style="font-size: 48px; margin-bottom: 15px;">🚀</div>
                     <h2>Chat Cleared!</h2>
                     <p>Start a new conversation with fresh trending topics</p>
-                    <p style="font-size:13px; opacity:0.7;">💡 Use <strong>/image</strong> or <strong>/img</strong> to generate images!</p>
                     <div class="suggestions">
                         ${suggestions.map(s =>
                             `<div class="suggestion-chip" onclick="sendSuggestion('${s.text}')">${s.emoji} ${s.label}</div>`
