@@ -1,11 +1,10 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
-import base64
-import requests
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from groq import Groq
 from datetime import datetime
 
 # Load environment variables
@@ -17,11 +16,45 @@ CORS(app)
 
 # Configure APIs
 google_api_key = os.getenv('GOOGLE_API_KEY')
-deepai_api_key = os.getenv('DEEPAI_API_KEY')
-client = genai.Client(api_key=google_api_key) if google_api_key else None
+groq_api_key   = os.getenv('GROQ_API_KEY')
+
+gemini_client = genai.Client(api_key=google_api_key) if google_api_key else None
+groq_client   = Groq(api_key=groq_api_key) if groq_api_key else None
 
 # In-memory conversation storage
-conversations = {}
+conversations     = {}
+conversation_turn = {}  # True = Gemini, False = Groq
+
+# Keywords that indicate image generation requests
+IMAGE_KEYWORDS = [
+    'generate image', 'generate a image', 'generate an image',
+    'create image', 'create a image', 'create an image',
+    'make image', 'make a image', 'make an image',
+    'draw', 'draw me', 'paint', 'paint me',
+    'image of', 'picture of', 'photo of',
+    'generate picture', 'create picture', 'make picture',
+    'show me a', 'show me an',
+]
+
+# Keywords that indicate creator/about questions
+CREATOR_KEYWORDS = [
+    'who made you', 'who created you', 'who built you', 'who designed you',
+    'who is your creator', 'who is your developer', 'who is your maker',
+    'your creator', 'your developer', 'your maker', 'your author',
+    'who owns you', 'who wrote you', 'who programmed you',
+    'what are you', 'who are you', 'tell me about yourself',
+    'about you', 'about yourself',
+]
+
+
+def is_image_request(message):
+    lower = message.lower()
+    return any(keyword in lower for keyword in IMAGE_KEYWORDS)
+
+
+def is_creator_request(message):
+    lower = message.lower()
+    return any(keyword in lower for keyword in CREATOR_KEYWORDS)
 
 
 def call_gemini_api(messages, api_key=None):
@@ -29,9 +62,9 @@ def call_gemini_api(messages, api_key=None):
     try:
         key = api_key or google_api_key
         if not key:
-            return {'success': False, 'error': 'No API key configured'}
+            return {'success': False, 'error': 'No Gemini API key configured'}
 
-        api_client = genai.Client(api_key=key)
+        client = genai.Client(api_key=key)
 
         full_prompt = ''
         if len(messages) > 1:
@@ -44,7 +77,7 @@ def call_gemini_api(messages, api_key=None):
         user_message = messages[-1]['content']
         full_prompt += f"User: {user_message}"
 
-        response = api_client.models.generate_content(
+        response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=full_prompt,
             config=types.GenerateContentConfig(
@@ -55,44 +88,32 @@ def call_gemini_api(messages, api_key=None):
             )
         )
 
-        return {'success': True, 'message': response.text}
+        return {'success': True, 'message': response.text, 'provider': 'Gemini'}
 
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
 
-def generate_image(prompt, api_key=None):
-    """Generate image using DeepAI (free tier)"""
+def call_groq_api(messages):
+    """Call Groq API"""
     try:
-        key = deepai_api_key
-        if not key:
-            return {'success': False, 'error': 'DEEPAI_API_KEY not configured in environment'}
+        if not groq_client:
+            return {'success': False, 'error': 'No Groq API key configured'}
 
-        r = requests.post(
-            'https://api.deepai.org/api/text2img',
-            data={'text': prompt},
-            headers={'api-key': key},
-            timeout=60
+        groq_messages = [
+            {'role': msg['role'], 'content': msg['content']}
+            for msg in messages
+        ]
+
+        response = groq_client.chat.completions.create(
+            model='llama-3.3-70b-versatile',
+            messages=groq_messages,
+            temperature=0.7,
+            max_tokens=8192,
         )
 
-        if r.status_code == 200:
-            result = r.json()
-            image_url = result.get('output_url')
-            if not image_url:
-                return {'success': False, 'error': 'No image URL in response'}
+        return {'success': True, 'message': response.choices[0].message.content, 'provider': 'Groq'}
 
-            # Fetch the image and convert to base64
-            img_response = requests.get(image_url, timeout=30)
-            if img_response.status_code == 200:
-                b64 = base64.b64encode(img_response.content).decode('utf-8')
-                return {'success': True, 'image': f'data:image/jpeg;base64,{b64}'}
-            else:
-                return {'success': False, 'error': f'Failed to fetch image: HTTP {img_response.status_code}'}
-        else:
-            return {'success': False, 'error': f'DeepAI returned HTTP {r.status_code}: {r.text[:200]}'}
-
-    except requests.exceptions.Timeout:
-        return {'success': False, 'error': 'Image generation timed out. Please try again.'}
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
@@ -105,50 +126,60 @@ def index():
 @app.route('/api/chat', methods=['POST'])
 def chat():
     try:
-        data = request.json
-        message = data.get('message')
-        api_key = data.get('apiKey')
+        data            = request.json
+        message         = data.get('message')
+        api_key         = data.get('apiKey')
         conversation_id = data.get('conversationId', str(int(datetime.now().timestamp() * 1000)))
 
         if not message:
             return jsonify({'error': 'Message is required'}), 400
 
+        # Block image generation requests
+        if is_image_request(message):
+            return jsonify({
+                'message': '🚫 **Image generation is not available.**\n\nI can only assist with text-based conversations. Try asking me something else!',
+                'conversationId': conversation_id,
+                'imageBlocked': True
+            })
+
+        # Creator/about questions
+        if is_creator_request(message):
+            return jsonify({
+                'message': '🌙 I was created by **moonlost**.',
+                'conversationId': conversation_id
+            })
+
         history = conversations.get(conversation_id, [])
         history.append({'role': 'user', 'content': message})
         messages = history[-20:]
 
-        result = call_gemini_api(messages, api_key)
+        # Alternate between Gemini and Groq
+        use_gemini = conversation_turn.get(conversation_id, True)
+        conversation_turn[conversation_id] = not use_gemini
+
+        if use_gemini:
+            result = call_gemini_api(messages, api_key)
+            if not result['success']:
+                result = call_groq_api(messages)  # fallback
+        else:
+            result = call_groq_api(messages)
+            if not result['success']:
+                result = call_gemini_api(messages, api_key)  # fallback
+
         if not result['success']:
             return jsonify({'error': result['error']}), 500
 
         history.append({'role': 'assistant', 'content': result['message']})
         conversations[conversation_id] = history
 
-        return jsonify({'message': result['message'], 'conversationId': conversation_id})
+        return jsonify({
+            'message': result['message'],
+            'conversationId': conversation_id,
+            'provider': result.get('provider', 'AI')
+        })
 
     except Exception as e:
         print(f'Chat error: {e}')
-        return jsonify({'error': 'Internal server error'}), 500
-
-
-@app.route('/api/generate-image', methods=['POST'])
-def generate_image_endpoint():
-    try:
-        data = request.json
-        prompt = data.get('prompt')
-        api_key = data.get('apiKey')
-
-        if not prompt:
-            return jsonify({'error': 'Prompt is required'}), 400
-
-        result = generate_image(prompt, api_key)
-        if not result['success']:
-            return jsonify({'error': result['error']}), 500
-
-        return jsonify({'image': result['image']})
-
-    except Exception as e:
-        print(f'Image generation error: {e}')
         return jsonify({'error': 'Internal server error'}), 500
 
 
@@ -164,6 +195,8 @@ def get_conversation(conversation_id):
 def delete_conversation(conversation_id):
     if conversation_id in conversations:
         del conversations[conversation_id]
+    if conversation_id in conversation_turn:
+        del conversation_turn[conversation_id]
     return jsonify({'message': 'Conversation cleared'})
 
 
@@ -173,7 +206,7 @@ def health():
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
         'geminiConfigured': bool(google_api_key),
-        'imageConfigured': bool(deepai_api_key)
+        'groqConfigured':   bool(groq_api_key),
     })
 
 
@@ -186,7 +219,7 @@ if __name__ == '__main__':
     print(f'🌐 Frontend: http://localhost:{port}')
     print(f'📡 Health check: http://localhost:{port}/api/health')
     print(f'🔑 Gemini API: {"Configured ✓" if google_api_key else "Not configured ✗"}')
-    print(f'🎨 Image API: {"DeepAI ✓" if deepai_api_key else "Not configured ✗"}')
+    print(f'⚡ Groq API:   {"Configured ✓" if groq_api_key else "Not configured ✗"}')
     print('━' * 42 + '\n')
 
     app.run(host='0.0.0.0', port=port, debug=False)
