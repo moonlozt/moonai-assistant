@@ -145,7 +145,7 @@ def chat():
         # Creator/about questions
         if is_creator_request(message):
             return jsonify({
-                'message': '🌙 I was created by **moonlost**.',
+                'message': '🌙 I was created by **Moonlost**.',
                 'conversationId': conversation_id
             })
 
