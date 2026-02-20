@@ -25,6 +25,22 @@ groq_client   = Groq(api_key=groq_api_key) if groq_api_key else None
 conversations     = {}
 conversation_turn = {}  # True = Gemini, False = Groq
 
+# Keywords that indicate code requests (checked before image to avoid false positives)
+CODE_KEYWORDS = [
+    'code', 'syntax', 'script', 'program', 'function',
+    'example', 'snippet', 'how to code', 'how to write',
+    'show me how', 'show me a example', 'show me a syntax',
+    'show me a code', 'show me a script', 'show me a function',
+    'write a', 'write me a', 'write me the',
+    'give me a code', 'give me a syntax', 'give me a script',
+    'give me an example', 'give me a function',
+    'print hello', 'hello world', 'algorithm', 'pseudocode',
+    'how do i', 'how to make a', 'how to build a',
+    'tutorial', 'explain how', 'show me how to',
+    'loop', 'array', 'string', 'integer', 'variable',
+    'class', 'object', 'method', 'import', 'library',
+]
+
 # Keywords that indicate image generation requests
 IMAGE_KEYWORDS = [
     # /command style
@@ -121,6 +137,11 @@ Despite the rumors of his otherworldly origins, Moonlost is not an alien; he is 
 
 Moonlost engineered the **MoonAI** structure with a singular goal: to streamline human labor through advanced technology, making our daily lives as effortless as a walk in zero gravity. But even a cosmic pioneer needs a break. When he isn't leading interstellar expeditions or refining neural networks, Moonlost enjoys the simple joys of life — immersing himself in video games and relaxing with his loyal companion, **Luki🐶**, a pet dog who has traveled more light-years✨ than most humans can imagine."""
 # ───────────────────────────────────────────────────────────────────────────
+
+
+def is_code_request(message):
+    lower = message.lower().strip()
+    return any(keyword in lower for keyword in CODE_KEYWORDS)
 
 
 def is_image_request(message):
@@ -221,8 +242,8 @@ def chat():
         if not message:
             return jsonify({'error': 'Message is required'}), 400
 
-        # Block image generation requests
-        if is_image_request(message):
+        # Block image generation requests (skip if it's actually a code request)
+        if is_image_request(message) and not is_code_request(message):
             return jsonify({
                 'message': '🚫 **Image generation is not available.**\n\nI can only assist with text-based conversations. Try asking me something else!',
                 'conversationId': conversation_id,

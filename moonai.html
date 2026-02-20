@@ -74,16 +74,16 @@
         let currentSession = 0;
 
         const trendingCategories = [
-            { emoji: '🤖', topics: ['AI', 'Machine Learning', 'Deep Learning', 'Neural Networks', 'Automation'],       labels: ['AI', 'Machine Learning', 'Deep Learning', 'Neural Nets', 'Automation'] },
-            { emoji: '🌍', topics: ['Climate Change', 'Space Exploration', 'Earth', 'Ocean', 'Nature'],                labels: ['Climate', 'Space', 'Earth', 'Ocean', 'Nature'] },
-            { emoji: '💻', topics: ['Coding', 'Python', 'JavaScript', 'Web Development', 'App Development'],           labels: ['Coding', 'Python', 'JavaScript', 'Web Dev', 'Apps'] },
-            { emoji: '🎮', topics: ['Gaming', 'Esports', 'Virtual Reality', 'Augmented Reality', 'Metaverse'],         labels: ['Gaming', 'Esports', 'VR', 'AR', 'Metaverse'] },
-            { emoji: '💡', topics: ['Innovation', 'Startups', 'Technology', 'Future Tech', 'Ideas'],                   labels: ['Innovation', 'Startups', 'Tech', 'Future', 'Ideas'] },
-            { emoji: '🎨', topics: ['Art', 'Design', 'Creativity', 'Music', 'Films'],                                  labels: ['Art', 'Design', 'Creative', 'Music', 'Films'] },
-            { emoji: '📱', topics: ['Smartphones', 'Apps', 'Social Media', 'Digital', 'Online Trends'],               labels: ['Phones', 'Apps', 'Social', 'Digital', 'Online'] },
-            { emoji: '🚀', topics: ['SpaceX', 'NASA', 'Mars', 'Rockets', 'Astronomy'],                                labels: ['SpaceX', 'NASA', 'Mars', 'Rockets', 'Space'] },
-            { emoji: '🧬', topics: ['Science', 'Biology', 'DNA', 'Research', 'Health Tech'],                          labels: ['Science', 'Biology', 'DNA', 'Research', 'Health'] },
-            { emoji: '⚡', topics: ['Energy', 'Electric Vehicles', 'Solar Power', 'Battery Tech', 'Sustainability'],   labels: ['Energy', 'EVs', 'Solar', 'Battery', 'Green Tech'] }
+            { emoji: '🤖', topics: ['AI', 'Machine Language', 'Deep Learning', 'Neural Networks', 'Automation'],      labels: ['AI', 'Machine Learning', 'Deep Learning', 'Neural Nets', 'Automation'] },
+            { emoji: '🌍', topics: ['Climate Change', 'Space Exploration', 'Earth', 'Ocean', 'Nature'],               labels: ['Climate', 'Space', 'Earth', 'Ocean', 'Nature'] },
+            { emoji: '💻', topics: ['Coding', 'Python', 'JavaScript', 'Web Development', 'App Development'],          labels: ['Coding', 'Python', 'JavaScript', 'Web Dev', 'Apps'] },
+            { emoji: '🎮', topics: ['Gaming', 'Esports', 'Virtual Reality', 'Augmented Reality', 'Metaverse'],        labels: ['Gaming', 'Esports', 'VR', 'AR', 'Metaverse'] },
+            { emoji: '💡', topics: ['Innovation', 'Startups', 'Technology', 'Future Tech', 'Ideas'],                  labels: ['Innovation', 'Startups', 'Tech', 'Future', 'Ideas'] },
+            { emoji: '🎨', topics: ['Art', 'Design', 'Creativity', 'Music', 'Films'],                                 labels: ['Art', 'Design', 'Creative', 'Music', 'Films'] },
+            { emoji: '📱', topics: ['Smartphones', 'Apps', 'Social Media', 'Digital', 'Online Trends'],              labels: ['Phones', 'Apps', 'Social', 'Digital', 'Online'] },
+            { emoji: '🚀', topics: ['SpaceX', 'NASA', 'Mars', 'Rockets', 'Astronomy'],                               labels: ['SpaceX', 'NASA', 'Mars', 'Rockets', 'Space'] },
+            { emoji: '🧬', topics: ['Science', 'Biology', 'DNA', 'Research', 'Health Tech'],                         labels: ['Science', 'Biology', 'DNA', 'Research', 'Health'] },
+            { emoji: '⚡', topics: ['Energy', 'Electric Vehicles', 'Solar Power', 'Battery Tech', 'Sustainability'],  labels: ['Energy', 'EVs', 'Solar', 'Battery', 'Green Tech'] }
         ];
 
         const suggestionTemplates = [
@@ -167,6 +167,14 @@
 
         setTimeout(() => { userInput.focus(); }, 7500);
 
+        function copyCode(btn) {
+            const code = btn.closest('.code-block').querySelector('code').innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = 'Copy', 2000);
+            });
+        }
+
         function addMessage(text, isUser, isError = false) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user' : 'bot'} ${isError ? 'error' : ''}`;
@@ -175,9 +183,27 @@
             contentDiv.className = 'message-content';
 
             let formatted = text
+                // code blocks with optional language label
+                .replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
+                    const language = lang || 'code';
+                    return `
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">${language}</span>
+                                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            </div>
+                            <pre><code>${code.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
+                        </div>
+                    `;
+                })
+                // inline code
+                .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
+                // bold
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g,     '<em>$1</em>')
-                .replace(/`([^`]+)`/g,     '<code>$1</code>');
+                // italic
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                // line breaks
+                .replace(/\n/g, '<br>');
 
             contentDiv.innerHTML = formatted;
             messageDiv.appendChild(contentDiv);

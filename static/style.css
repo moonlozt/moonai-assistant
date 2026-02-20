@@ -451,3 +451,147 @@ body::before {
     .header { padding-top: max(clamp(8px, 2vw, 16px), env(safe-area-inset-top)); }
     .input-area { padding-bottom: max(clamp(10px, 2vw, 20px), env(safe-area-inset-bottom)); }
 }
+
+/* ============================================================
+   CODE BLOCKS
+   ============================================================ */
+.code-block {
+    position: relative;
+    background: rgba(0, 0, 0, 0.4);
+    border: 0.5px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    margin: 32px 0 10px 0;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+    width: 100%;
+    box-sizing: border-box;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.code-header {
+    position: absolute;
+    top: -28px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2px;
+    height: 26px;
+    background: transparent;
+    border: none;
+}
+
+.code-lang {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: clamp(10px, 1.4vw, 11px);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-family: 'Courier New', monospace;
+    font-weight: 500;
+    line-height: 26px;
+}
+
+.copy-btn {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.6);
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
+    padding: 3px 12px;
+    border-radius: 100px;
+    cursor: pointer;
+    font-size: clamp(10px, 1.4vw, 11px);
+    font-weight: 400;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+    height: 22px;
+    line-height: 1;
+}
+
+.copy-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.copy-btn:active {
+    transform: scale(0.95);
+}
+
+.code-block pre {
+    margin: 0;
+    padding: clamp(10px, 2vw, 16px);
+    overflow-x: auto;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: clamp(11px, 1.8vw, 13px);
+    line-height: 1.7;
+    -webkit-overflow-scrolling: touch;
+}
+
+.code-block code {
+    font-family: 'Courier New', monospace;
+    white-space: pre;
+    display: block;
+    width: max-content;
+    min-width: 100%;
+}
+
+/* scrollbar matches chat scrollbar */
+.code-block pre::-webkit-scrollbar {
+    height: 4px;
+}
+
+.code-block pre::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.code-block pre::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+}
+
+.code-block pre::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.inline-code {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.9);
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: clamp(11px, 1.8vw, 13px);
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
+    word-break: break-word;
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+    .code-block {
+        border-radius: 10px;
+        margin-top: 30px;
+    }
+
+    .code-header {
+        top: -26px;
+        height: 24px;
+    }
+
+    .copy-btn {
+        height: 20px;
+        padding: 2px 10px;
+        font-size: 10px;
+    }
+
+    .code-lang {
+        font-size: 10px;
+    }
+
+    .code-block pre {
+        font-size: 12px;
+        padding: 10px 12px;
+    }
+}
