@@ -27,34 +27,115 @@ conversation_turn = {}  # True = Gemini, False = Groq
 
 # Keywords that indicate image generation requests
 IMAGE_KEYWORDS = [
+    # /command style
+    '/image', '/img', '/imagine', '/draw', '/paint', '/generate',
+    # generate
     'generate image', 'generate a image', 'generate an image',
+    'generate me', 'generate a photo', 'generate a picture',
+    'generate a drawing', 'generate a illustration',
+    # create
     'create image', 'create a image', 'create an image',
+    'create me', 'create a photo', 'create a picture',
+    'create a drawing', 'create a illustration',
+    # make
     'make image', 'make a image', 'make an image',
-    'draw', 'draw me', 'paint', 'paint me',
-    'image of', 'picture of', 'photo of',
+    'make me', 'make a photo', 'make a picture',
+    'make a drawing', 'make a illustration',
+    # draw
+    'draw', 'draw me', 'draw a', 'draw an', 'draw something',
+    # paint
+    'paint', 'paint me', 'paint a', 'paint an',
+    # show
+    'show me a', 'show me an', 'show me image', 'show me picture',
+    # render
+    'render', 'render me', 'render a', 'render an',
+    # image/picture/photo of
+    'image of', 'picture of', 'photo of', 'illustration of',
+    'drawing of', 'painting of', 'sketch of',
+    # generate picture/photo
     'generate picture', 'create picture', 'make picture',
-    'show me a', 'show me an',
+    'generate photo', 'create photo', 'make photo',
+    # can you
+    'can you draw', 'can you paint', 'can you generate',
+    'can you create a image', 'can you make a image',
+    'can you create an image', 'can you make an image',
+    'can you show me a picture', 'can you show me an image',
+    # misc
+    'visualize', 'visualise', 'design me', 'design a',
+    'produce an image', 'produce a picture',
 ]
 
 # Keywords that indicate creator/about questions
 CREATOR_KEYWORDS = [
-    'who made you', 'who created you', 'who built you', 'who designed you',
-    'who is your creator', 'who is your developer', 'who is your maker',
-    'your creator', 'your developer', 'your maker', 'your author',
-    'who owns you', 'who wrote you', 'who programmed you',
-    'what are you', 'who are you', 'tell me about yourself',
+    # who made/created/built
+    'who made you', 'who made u', 'who made this',
+    'who created you', 'who created u', 'who created this',
+    'who built you', 'who built u', 'who built this',
+    'who designed you', 'who designed u', 'who designed this',
+    'who developed you', 'who developed u', 'who developed this',
+    'who coded you', 'who coded u', 'who coded this',
+    'who programmed you', 'who programmed u', 'who programmed this',
+    'who wrote you', 'who wrote u', 'who made u bro',
+    # your creator/owner
+    'who is your creator', 'who is your developer',
+    'who is your maker', 'who is your owner',
+    'who is your author', 'who is your programmer',
+    'your creator', 'your developer', 'your maker',
+    'your author', 'your owner', 'your programmer',
+    # who are you / what are you
+    'who are you', 'who r u', 'who ru',
+    'what are you', 'what r u',
+    'what is moonai', 'what is moon ai',
+    'tell me about yourself', 'tell me about you',
     'about you', 'about yourself',
+    # introduce yourself
+    'introduce yourself', 'introduce urself',
+    # are you
+    'are you ai', 'are you a bot', 'are you a robot',
+    'are you chatgpt', 'are you gemini', 'are you gpt',
+    # made by
+    'made by who', 'created by who', 'built by who',
+    'developed by who', 'coded by who',
+    # origin
+    'where are you from', 'where do you come from',
+    'what is your origin', 'whats your origin',
 ]
+
+# Keywords asking about moonlost
+MOONLOST_KEYWORDS = [
+    'who is moonlost', 'who is moon lost', 'moonlost who',
+    'tell me about moonlost', 'tell me about moon lost',
+    'what is moonlost', 'what is moon lost',
+    'moonlost info', 'moonlost information',
+    'who is the owner', 'who is the creator moonlost',
+    'about moonlost', 'moonlost?',
+    'moonlost developer', 'moonlost creator',
+    'is moonlost a person', 'is moonlost real',
+    'who is moon',
+]
+
+# ── Edit this to say whatever you want about moonlost ──────────────────────
+MOONLOST_RESPONSE = """**Moonlost🌕** — Creator & Developer of MoonAI
+
+Despite the rumors of his otherworldly origins, Moonlost is not an alien; he is a human visionary who looked at the stars and decided to build a bridge for the rest of us. He is the founder and commanding leader of **GoS**, the galaxy's most prestigious collective of space explorers dedicated to charting the unknown reaches of the deep cosmos.
+
+Moonlost engineered the **MoonAI** structure with a singular goal: to streamline human labor through advanced technology, making our daily lives as effortless as a walk in zero gravity. But even a cosmic pioneer needs a break. When he isn't leading interstellar expeditions or refining neural networks, Moonlost enjoys the simple joys of life — immersing himself in video games and relaxing with his loyal companion, **Luki🐶**, a pet dog who has traveled more light-years✨ than most humans can imagine."""
+# ───────────────────────────────────────────────────────────────────────────
 
 
 def is_image_request(message):
-    lower = message.lower()
+    lower = message.lower().strip()
     return any(keyword in lower for keyword in IMAGE_KEYWORDS)
 
 
 def is_creator_request(message):
-    lower = message.lower()
+    lower = message.lower().strip()
     return any(keyword in lower for keyword in CREATOR_KEYWORDS)
+
+
+def is_moonlost_request(message):
+    lower = message.lower().strip()
+    return any(keyword in lower for keyword in MOONLOST_KEYWORDS)
 
 
 def call_gemini_api(messages, api_key=None):
@@ -118,6 +199,12 @@ def call_groq_api(messages):
         return {'success': False, 'error': str(e)}
 
 
+@app.after_request
+def add_language_header(response):
+    response.headers['Content-Language'] = 'en'
+    return response
+
+
 @app.route('/')
 def index():
     return send_from_directory('.', 'moonai.html')
@@ -140,6 +227,13 @@ def chat():
                 'message': '🚫 **Image generation is not available.**\n\nI can only assist with text-based conversations. Try asking me something else!',
                 'conversationId': conversation_id,
                 'imageBlocked': True
+            })
+
+        # Moonlost questions (check before creator so it's more specific)
+        if is_moonlost_request(message):
+            return jsonify({
+                'message': MOONLOST_RESPONSE,
+                'conversationId': conversation_id
             })
 
         # Creator/about questions
