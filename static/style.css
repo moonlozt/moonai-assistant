@@ -255,7 +255,7 @@ body::before {
     border-radius: 18px;
     word-wrap: break-word;
     line-height: 1.5;
-    white-space: pre-wrap;
+    white-space: normal;
     font-size: clamp(12px, 2vw, 15px);
     font-weight: 400;
 }
@@ -324,35 +324,9 @@ body::before {
     z-index: 1;
 }
 
-.api-setup {
-    margin-bottom: 12px;
-    padding: clamp(8px, 1.5vw, 12px);
-    background: rgba(255,255,255,0.06);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-radius: 12px;
-    border: 0.5px solid rgba(255,255,255,0.1);
-}
-
-.api-setup.hidden { display: none; }
-.api-setup label { display: block; margin-bottom: 6px; font-size: clamp(9px, 1.5vw, 11px); color: #ffffff; font-weight: 500; opacity: 0.7; }
-.api-setup input {
-    width: 100%;
-    padding: clamp(7px, 1.5vw, 10px) 12px;
-    border: 0.5px solid rgba(255,255,255,0.15);
-    border-radius: 10px;
-    font-size: clamp(11px, 1.8vw, 13px);
-    margin-bottom: 4px;
-    background: rgba(255,255,255,0.08);
-    color: #fff;
-}
-.api-setup input:focus { outline: none; border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.12); }
-.api-setup small { color: #999; font-size: clamp(9px, 1.2vw, 10px); }
-.api-setup a { color: #fff; text-decoration: none; font-weight: 500; }
-
-.input-form { 
-    display: flex; 
-    gap: clamp(5px, 1vw, 8px); 
+.input-form {
+    display: flex;
+    gap: clamp(5px, 1vw, 8px);
     align-items: center;
     flex-wrap: nowrap;
 }
@@ -456,142 +430,112 @@ body::before {
    CODE BLOCKS
    ============================================================ */
 .code-block {
-    position: relative;
-    background: rgba(0, 0, 0, 0.4);
-    border: 0.5px solid rgba(255, 255, 255, 0.12);
-    border-radius: 14px;
-    margin: 32px 0 10px 0;
-    overflow: hidden;
-    font-family: 'Courier New', monospace;
-    width: 100%;
-    box-sizing: border-box;
+    background: rgba(20, 20, 20, 0.7);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    margin: 8px 0;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    white-space: normal;
 }
 
 .code-header {
-    position: absolute;
-    top: -28px;
-    left: 0;
-    right: 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 2px;
-    height: 26px;
-    background: transparent;
-    border: none;
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+    padding: 8px 14px;
+    margin: 0;
 }
 
 .code-lang {
-    color: rgba(255, 255, 255, 0.4);
-    font-size: clamp(10px, 1.4vw, 11px);
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    font-family: 'Courier New', monospace;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
     font-weight: 500;
-    line-height: 26px;
+    letter-spacing: 0.2px;
+    line-height: 1;
+    margin: 0;
+    padding: 0;
+}
+
+.code-icon {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 11px;
+    font-family: 'Courier New', Courier, monospace;
 }
 
 .copy-btn {
     display: inline-flex;
     align-items: center;
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.6);
-    border: 0.5px solid rgba(255, 255, 255, 0.1);
-    padding: 3px 12px;
-    border-radius: 100px;
+    justify-content: center;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.4);
+    border: none;
+    padding: 0;
     cursor: pointer;
-    font-size: clamp(10px, 1.4vw, 11px);
-    font-weight: 400;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
-    height: 22px;
+    font-size: 18px;
     line-height: 1;
+    transition: color 0.2s ease;
+    margin: 0;
 }
 
-.copy-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: #ffffff;
-    border-color: rgba(255, 255, 255, 0.2);
-}
-
-.copy-btn:active {
-    transform: scale(0.95);
-}
+.copy-btn:hover { color: rgba(255, 255, 255, 0.9); }
+.copy-btn:active { transform: scale(0.9); }
 
 .code-block pre {
     margin: 0;
-    padding: clamp(10px, 2vw, 16px);
+    padding: clamp(10px, 2vw, 14px);
+    padding-bottom: 0;
     overflow-x: auto;
+    overflow-y: hidden;
     color: rgba(255, 255, 255, 0.85);
-    font-size: clamp(11px, 1.8vw, 13px);
+    font-size: clamp(12px, 1.8vw, 13px);
     line-height: 1.7;
     -webkit-overflow-scrolling: touch;
+    white-space: pre;
+    background: transparent;
 }
 
 .code-block code {
-    font-family: 'Courier New', monospace;
+    font-family: 'Courier New', Courier, monospace;
     white-space: pre;
     display: block;
     width: max-content;
     min-width: 100%;
+    margin: 0;
+    padding-bottom: clamp(8px, 2vw, 12px);
 }
 
-/* scrollbar matches chat scrollbar */
-.code-block pre::-webkit-scrollbar {
-    height: 4px;
-}
-
-.code-block pre::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.code-block pre::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 2px;
-}
-
-.code-block pre::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.25);
-}
+.code-block pre::-webkit-scrollbar { height: 2px; background: transparent; }
+.code-block pre::-webkit-scrollbar-track { background: transparent; margin: 0; }
+.code-block pre::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 0; }
+.code-block pre::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+.code-block pre::-webkit-scrollbar-corner { background: transparent; }
 
 .inline-code {
     background: rgba(255, 255, 255, 0.08);
     color: rgba(255, 255, 255, 0.9);
     padding: 2px 7px;
     border-radius: 6px;
-    font-family: 'Courier New', monospace;
-    font-size: clamp(11px, 1.8vw, 13px);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9em;
     border: 0.5px solid rgba(255, 255, 255, 0.1);
     word-break: break-word;
+    white-space: normal;
 }
 
-/* Mobile */
 @media (max-width: 480px) {
-    .code-block {
-        border-radius: 10px;
-        margin-top: 30px;
-    }
-
-    .code-header {
-        top: -26px;
-        height: 24px;
-    }
-
-    .copy-btn {
-        height: 20px;
-        padding: 2px 10px;
-        font-size: 10px;
-    }
-
-    .code-lang {
-        font-size: 10px;
-    }
-
-    .code-block pre {
-        font-size: 12px;
-        padding: 10px 12px;
-    }
+    .code-block { border-radius: 8px; }
+    .code-header { padding: 6px 12px; }
+    .code-lang { font-size: 11px; }
+    .copy-btn { font-size: 16px; }
+    .code-block pre { font-size: 12px; padding: 10px; padding-bottom: 0; }
 }

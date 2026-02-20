@@ -1,10 +1,8 @@
 <!DOCTYPE html>
-<html lang="en" translate="no">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Language" content="en">
-    <meta name="google" content="notranslate">
     <title>MoonAI</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -74,7 +72,7 @@
         let currentSession = 0;
 
         const trendingCategories = [
-            { emoji: '🤖', topics: ['AI', 'Machine Language', 'Deep Learning', 'Neural Networks', 'Automation'],      labels: ['AI', 'Machine Learning', 'Deep Learning', 'Neural Nets', 'Automation'] },
+            { emoji: '🤖', topics: ['AI', 'Machine Learning', 'Deep Learning', 'Neural Networks', 'Automation'],      labels: ['AI', 'Machine Learning', 'Deep Learning', 'Neural Nets', 'Automation'] },
             { emoji: '🌍', topics: ['Climate Change', 'Space Exploration', 'Earth', 'Ocean', 'Nature'],               labels: ['Climate', 'Space', 'Earth', 'Ocean', 'Nature'] },
             { emoji: '💻', topics: ['Coding', 'Python', 'JavaScript', 'Web Development', 'App Development'],          labels: ['Coding', 'Python', 'JavaScript', 'Web Dev', 'Apps'] },
             { emoji: '🎮', topics: ['Gaming', 'Esports', 'Virtual Reality', 'Augmented Reality', 'Metaverse'],        labels: ['Gaming', 'Esports', 'VR', 'AR', 'Metaverse'] },
@@ -131,7 +129,7 @@
             try {
                 const trendData = await fetchTrendingTopics();
                 dynamicText.textContent   = trendData.label;
-                trendSubtitle.textContent = `Alien Radar`;
+                trendSubtitle.textContent = 'Alien Radar';
                 const suggestions = generateSuggestions();
                 suggestionChips.innerHTML = suggestions.map(s =>
                     `<div class="suggestion-chip" onclick="sendSuggestion('${s.text}')">${s.emoji} ${s.label}</div>`
@@ -167,14 +165,40 @@
 
         setTimeout(() => { userInput.focus(); }, 7500);
 
+        // ─── Copy code button ─────────────────────────────────────────────────
         function copyCode(btn) {
             const code = btn.closest('.code-block').querySelector('code').innerText;
-            navigator.clipboard.writeText(code).then(() => {
-                btn.textContent = 'Copied!';
-                setTimeout(() => btn.textContent = 'Copy', 2000);
-            });
+
+            const doFallback = () => {
+                const textarea = document.createElement('textarea');
+                textarea.value = code;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity  = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+            };
+
+            const onSuccess = () => {
+                btn.innerHTML  = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+                setTimeout(() => {
+                    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+                }, 2000);
+            };
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(code).then(onSuccess).catch(() => {
+                    doFallback();
+                    onSuccess();
+                });
+            } else {
+                doFallback();
+                onSuccess();
+            }
         }
 
+        // ─── Add message bubble ───────────────────────────────────────────────
         function addMessage(text, isUser, isError = false) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user' : 'bot'} ${isError ? 'error' : ''}`;
@@ -183,26 +207,14 @@
             contentDiv.className = 'message-content';
 
             let formatted = text
-                // code blocks with optional language label
                 .replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
                     const language = lang || 'code';
-                    return `
-                        <div class="code-block">
-                            <div class="code-header">
-                                <span class="code-lang">${language}</span>
-                                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                            </div>
-                            <pre><code>${code.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
-                        </div>
-                    `;
+                    const escaped  = code.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    return `<div class="code-block"><div class="code-header"><span class="code-lang"><span class="code-icon">&lt;/&gt;</span>${language}</span><button class="copy-btn" onclick="copyCode(this)" title="Copy code"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div><pre><code>${escaped}</code></pre></div>`;
                 })
-                // inline code
                 .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
-                // bold
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                // italic
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                // line breaks
                 .replace(/\n/g, '<br>');
 
             contentDiv.innerHTML = formatted;
@@ -213,6 +225,7 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
+        // ─── API call ─────────────────────────────────────────────────────────
         async function callChatAPI(userMessage) {
             const response = await fetch('/api/chat', {
                 method: 'POST',
@@ -228,6 +241,7 @@
             return data.message;
         }
 
+        // ─── Send message ─────────────────────────────────────────────────────
         async function sendMessage() {
             const message = userInput.value.trim();
             if (!message || isBusy) return;
@@ -242,7 +256,6 @@
             isBusy = true;
 
             const mySession = currentSession;
-
             const typingIndicator = document.getElementById('typingIndicator');
             typingIndicator.classList.add('active');
 
@@ -284,17 +297,21 @@
             currentSession++;
             isBusy = false;
 
+            // Delete conversation on backend (clears history + language context)
             if (conversationId) {
-                fetch(`/api/conversation/${conversationId}`, { method: 'DELETE' }).catch(() => {});
+                try {
+                    await fetch(`/api/conversation/${conversationId}`, { method: 'DELETE' });
+                } catch (e) {}
             }
             conversationId = null;
 
+            // Reset UI
             const suggestions = generateSuggestions();
             chatMessages.innerHTML = `
                 <div class="welcome-message">
                     <div style="font-size: 48px; margin-bottom: 15px;">🚀</div>
                     <h2>Chat Cleared!</h2>
-                    <p>Start a new conversation with fresh trending topics</p>
+                    <p>Start a new conversation</p>
                     <div class="suggestions">
                         ${suggestions.map(s =>
                             `<div class="suggestion-chip" onclick="sendSuggestion('${s.text}')">${s.emoji} ${s.label}</div>`

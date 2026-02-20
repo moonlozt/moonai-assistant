@@ -25,7 +25,15 @@ groq_client   = Groq(api_key=groq_api_key) if groq_api_key else None
 conversations     = {}
 conversation_turn = {}  # True = Gemini, False = Groq
 
-# Keywords that indicate code requests (checked before image to avoid false positives)
+# System prompt — forces English on every new conversation
+SYSTEM_PROMPT = (
+    "You are MoonAI, a helpful AI assistant. "
+    "Always respond in English by default. "
+    "Only switch to another language if the user explicitly asks you to. "
+    "When a new conversation starts, always reset to English regardless of any previous conversations."
+)
+
+# Keywords that indicate code requests
 CODE_KEYWORDS = [
     'code', 'syntax', 'script', 'program', 'function',
     'example', 'snippet', 'how to code', 'how to write',
@@ -43,47 +51,34 @@ CODE_KEYWORDS = [
 
 # Keywords that indicate image generation requests
 IMAGE_KEYWORDS = [
-    # /command style
     '/image', '/img', '/imagine', '/draw', '/paint', '/generate',
-    # generate
     'generate image', 'generate a image', 'generate an image',
     'generate me', 'generate a photo', 'generate a picture',
     'generate a drawing', 'generate a illustration',
-    # create
     'create image', 'create a image', 'create an image',
     'create me', 'create a photo', 'create a picture',
     'create a drawing', 'create a illustration',
-    # make
     'make image', 'make a image', 'make an image',
     'make me', 'make a photo', 'make a picture',
     'make a drawing', 'make a illustration',
-    # draw
     'draw', 'draw me', 'draw a', 'draw an', 'draw something',
-    # paint
     'paint', 'paint me', 'paint a', 'paint an',
-    # show
     'show me a', 'show me an', 'show me image', 'show me picture',
-    # render
     'render', 'render me', 'render a', 'render an',
-    # image/picture/photo of
     'image of', 'picture of', 'photo of', 'illustration of',
     'drawing of', 'painting of', 'sketch of',
-    # generate picture/photo
     'generate picture', 'create picture', 'make picture',
     'generate photo', 'create photo', 'make photo',
-    # can you
     'can you draw', 'can you paint', 'can you generate',
     'can you create a image', 'can you make a image',
     'can you create an image', 'can you make an image',
     'can you show me a picture', 'can you show me an image',
-    # misc
     'visualize', 'visualise', 'design me', 'design a',
     'produce an image', 'produce a picture',
 ]
 
 # Keywords that indicate creator/about questions
 CREATOR_KEYWORDS = [
-    # who made/created/built
     'who made you', 'who made u', 'who made this',
     'who created you', 'who created u', 'who created this',
     'who built you', 'who built u', 'who built this',
@@ -92,27 +87,21 @@ CREATOR_KEYWORDS = [
     'who coded you', 'who coded u', 'who coded this',
     'who programmed you', 'who programmed u', 'who programmed this',
     'who wrote you', 'who wrote u', 'who made u bro',
-    # your creator/owner
     'who is your creator', 'who is your developer',
     'who is your maker', 'who is your owner',
     'who is your author', 'who is your programmer',
     'your creator', 'your developer', 'your maker',
     'your author', 'your owner', 'your programmer',
-    # who are you / what are you
     'who are you', 'who r u', 'who ru',
     'what are you', 'what r u',
     'what is moonai', 'what is moon ai',
     'tell me about yourself', 'tell me about you',
     'about you', 'about yourself',
-    # introduce yourself
     'introduce yourself', 'introduce urself',
-    # are you
     'are you ai', 'are you a bot', 'are you a robot',
     'are you chatgpt', 'are you gemini', 'are you gpt',
-    # made by
     'made by who', 'created by who', 'built by who',
     'developed by who', 'coded by who',
-    # origin
     'where are you from', 'where do you come from',
     'what is your origin', 'whats your origin',
 ]
@@ -130,13 +119,11 @@ MOONLOST_KEYWORDS = [
     'who is moon',
 ]
 
-# ── Edit this to say whatever you want about moonlost ──────────────────────
 MOONLOST_RESPONSE = """**Moonlost🌕** — Creator & Developer of MoonAI
 
 Despite the rumors of his otherworldly origins, Moonlost is not an alien; he is a human visionary who looked at the stars and decided to build a bridge for the rest of us. He is the founder and commanding leader of **GoS**, the galaxy's most prestigious collective of space explorers dedicated to charting the unknown reaches of the deep cosmos.
 
 Moonlost engineered the **MoonAI** structure with a singular goal: to streamline human labor through advanced technology, making our daily lives as effortless as a walk in zero gravity. But even a cosmic pioneer needs a break. When he isn't leading interstellar expeditions or refining neural networks, Moonlost enjoys the simple joys of life — immersing himself in video games and relaxing with his loyal companion, **Luki🐶**, a pet dog who has traveled more light-years✨ than most humans can imagine."""
-# ───────────────────────────────────────────────────────────────────────────
 
 
 def is_code_request(message):
@@ -160,7 +147,7 @@ def is_moonlost_request(message):
 
 
 def call_gemini_api(messages, api_key=None):
-    """Call Google Gemini API"""
+    """Call Google Gemini API with system prompt"""
     try:
         key = api_key or google_api_key
         if not key:
@@ -168,13 +155,15 @@ def call_gemini_api(messages, api_key=None):
 
         client = genai.Client(api_key=key)
 
-        full_prompt = ''
+        # Build prompt with system instruction at the top
+        full_prompt = f"System: {SYSTEM_PROMPT}\n\n"
+
         if len(messages) > 1:
             context = '\n'.join([
                 f"{'User' if msg['role'] == 'user' else 'Assistant'}: {msg['content']}"
                 for msg in messages[:-1]
             ])
-            full_prompt = f"Previous conversation:\n{context}\n\n"
+            full_prompt += f"Previous conversation:\n{context}\n\n"
 
         user_message = messages[-1]['content']
         full_prompt += f"User: {user_message}"
@@ -197,12 +186,14 @@ def call_gemini_api(messages, api_key=None):
 
 
 def call_groq_api(messages):
-    """Call Groq API"""
+    """Call Groq API with system prompt"""
     try:
         if not groq_client:
             return {'success': False, 'error': 'No Groq API key configured'}
 
-        groq_messages = [
+        # Prepend system message
+        groq_messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
+        groq_messages += [
             {'role': msg['role'], 'content': msg['content']}
             for msg in messages
         ]
@@ -218,12 +209,6 @@ def call_groq_api(messages):
 
     except Exception as e:
         return {'success': False, 'error': str(e)}
-
-
-@app.after_request
-def add_language_header(response):
-    response.headers['Content-Language'] = 'en'
-    return response
 
 
 @app.route('/')
@@ -250,7 +235,7 @@ def chat():
                 'imageBlocked': True
             })
 
-        # Moonlost questions (check before creator so it's more specific)
+        # Moonlost questions
         if is_moonlost_request(message):
             return jsonify({
                 'message': MOONLOST_RESPONSE,
@@ -275,11 +260,11 @@ def chat():
         if use_gemini:
             result = call_gemini_api(messages, api_key)
             if not result['success']:
-                result = call_groq_api(messages)  # fallback
+                result = call_groq_api(messages)
         else:
             result = call_groq_api(messages)
             if not result['success']:
-                result = call_gemini_api(messages, api_key)  # fallback
+                result = call_gemini_api(messages, api_key)
 
         if not result['success']:
             return jsonify({'error': result['error']}), 500
